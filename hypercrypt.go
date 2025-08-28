@@ -5,141 +5,204 @@ import (
     "fmt"
 	"log"
 	"flag"
+	"path"
 	"strings"
 	"github.com/CyberReaper00/helper_utils/humain"
 )
 
-type FSObject interface {
-	[]os.DirEntry | string
-}
-
 func to_binary(data string) []byte { return []byte(data) }
 
-func encryption(data []byte, key_len int) []byte {
-	e_data := make([]byte, len(data))
-	shift  := key_len % 8
+func convertor(data []byte, key string, action string) []byte {
+	var shift int
+	key_len := len(key)
+	e_data  := make([]byte, len(data))
 
+	if key_len % 8 == 0 { shift = 7
+	} else { shift = key_len % 8 }
+
+	var rotated byte
 	for i, b := range data {
-		rotated	 := (b << shift) | (b >> (8 - shift))
+		switch action {
+			case "e": rotated = (b << shift) | (b >> (8 - shift))
+			case "d": rotated = (b >> shift) | (b << (8 - shift))
+		}
 		e_data[i] = rotated & 0xFF
 	}
 	return e_data
 }
 
-func decryption(data []byte, key_len int) []byte {
-	d_data := make([]byte, len(data))
-	shift  := key_len % 8
+// func encryption(data []byte, key_len int) []byte {
+// 	var shift int
+// 	e_data := make([]byte, len(data))
+//
+// 	if key_len % 8 == 0 { shift = 7
+// 	} else { shift = key_len % 8 }
+//
+// 	for i, b := range data {
+// 		rotated	 := (b << shift) | (b >> (8 - shift))
+// 		e_data[i] = rotated & 0xFF
+// 	}
+// 	return e_data
+// }
+//
+// func decryption(data []byte, key_len int) []byte {
+// 	var shift int
+// 	d_data := make([]byte, len(data))
+//
+// 	if key_len % 8 == 0 { shift = 7
+// 	} else { shift = key_len % 8 }
+//
+// 	for i, b := range data {
+// 		rotated  := (b >> shift) | (b << (8 - shift))
+// 		d_data[i] = rotated & 0xFF
+// 	}
+// 	return d_data
+// }
 
-	for i, b := range data {
-		rotated  := (b >> shift) | (b << (8 - shift))
-		d_data[i] = rotated & 0xFF
-	}
-	return d_data
-}
+func save_data_to_file(entry string, data []byte, keep bool, action string) {
 
-func save_data_to_file[T FSObject](entry T, data []byte, i int, main_dir string, mode string) {
-
-	var filename string
 	var new_file string
-	var path	 string
-	entry_type := entry.(type)
 
-	if entry_type == []os.DirEntry {
-		filename = fmt.Sprintf(entry[i].Name())
-		new_file = fmt.Sprintf(entry[i].Name()+"_e")
-		path	 = fmt.Sprintf(main_dir+dir[i].Name())
+	dir  := path.Dir(entry)
+	file := path.Base(entry)
+	ext	 := path.Ext(file)
+	filename, _, _ := strings.Cut(file, ext)
 
-	} else if entry_type == string {
-		filename = entry
-		new_file = entry+"_e"
-		path	 = entry
+	switch action {
+		case "e":
+			_ = os.Mkdir(fmt.Sprintf("%s_e", dir), 0755)
+			new_file = fmt.Sprintf("%s_e/%s_e%s", dir, filename, ext)
+			action = "encrypted"
+
+		case "d":
+			_ = os.Mkdir(fmt.Sprintf("%s_d", dir), 0755)
+			new_file = fmt.Sprintf("%s_d/%s_d%s", dir, filename, ext)
+			action = "decrypted"
 	}
 
-	file, err := os.Create(new_file)
-	if err != nil { humain.Err("couldnt create file: %s\n", new_file) }
+	file_ptr, err := os.Create(new_file)
+	humain.Err("couldnt create file: %s\n%s", err, new_file, err)
 
-	_, err = file.Write(data)
-	if err != nil { log.Fatalf("couldnt write to %s\n", new_file) }
-	defer file.Close()
+	_, err = file_ptr.Write(data)
+	humain.Err("couldnt write to %s\n%s", err, new_file, err)
+	defer file_ptr.Close()
 
-	action := ""
-	switch mode {
-		case "e": action = "encrypted"
-		case "d": action = "decrypted"
+	fmt.Printf("%s%s's data has been %s into %s'\n\n", filename, ext, action, new_file)
+	if !keep {
+		err = os.Remove(entry)
+		humain.Err("couldnt remove %v\n%v", err, entry, err)
+	}
+}
+
+func cryptify_dir(main_dir string, dir []os.DirEntry, i int, keep bool, key string, action string) {
+	if (i >= len(dir)) { return }
+
+	filepath := path.Join(main_dir, dir[i].Name())
+	filedata, err := os.ReadFile(filepath)
+	humain.Err("couldnt read file: %v\n%v", err, dir[i].Name(), err)
+
+	var output []byte
+	switch action {
+		case "e":
+			output = convertor(filedata, key, action)
+		case "d":
+			output = convertor(filedata, key, action)
 	}
 
-	fmt.Println(filename, "has been", action ,"as", new_file)
-	err = os.Remove(path)
-	if err != nil { log.Fatalf("couldnt remove %v\n%v", path, err) }
-}
-
-func encr_dir(main_dir string, dir []os.DirEntry, i int, key_len int) {
-	if (i >= len(dir)) { return count }
-
-	filedata, err := os.ReadFile(fmt.Sprintf(main_dir+dir[i].Name()))
-	if err != nil { log.Fatalf("couldnt read file: %v\n%v", dir[i].Name(), err) }
-	
-	bin_input := to_binary(filedata)
-	encr := encryption(bin_input, key_len)
-	save_data_to_file(dir, encr, i, main_dir, "e")
-
-	return encr_dir(dir, i+1, main_dir)
-}
-
-func decr_dir(main_dir string, dir []os.DirEntry, i int) {
-	if (i >= len(dir)) { return count }
-
-	filedata, err := os.ReadFile(fmt.Sprintf(main_dir+dir[i].Name()))
-	if err != nil { log.Fatalf("couldnt read file: %v\n%v", dir[i].Name(), err) }
-	
-	bin_input := to_binary(filedata)
-	decr := decryption(bin_input, key_len)
-	save_data_to_file(dir, decr, i, main_dir, "d")
-
-	return encr_dir(dir, i+1, main_dir)
+	save_data_to_file(filepath, output, keep, action)
+	cryptify_dir(main_dir, dir, i+1, keep, key, action)
 }
 
 func main() {
-	input	:= humain.Input("Enter text")
-	key		:= humain.Input("Enter key")
-
-	text 	:= input.(string)
-	key_len	:= len(key.(string))
 
 	t := flag.Bool("t", false, "description for t")
 	f := flag.Bool("f", false, "description for f")
 	d := flag.Bool("d", false, "description for d")
+	k := flag.Bool("k", false, "description for k")
 	E := flag.Bool("E", false, "description for E")
 	D := flag.Bool("D", false, "description for D")
 
-	if *t {
-		input := humain.Input("Enter message")
-		filedata, err := os.ReadFile(input)
-		if err != nil { humain.Err("couldnt locate file: %v\n%v", filename, err) }
-		encr := encryption(filedata, key_len)
-		save_data_to_file()
+	flag.Usage = func() {
+		fmt.Println("usage: [-h] [-k] [-options ...]")
 
-	} else if *f {
-		dir_name := humain.Input("Enter name or path of directory")
-		dir_contents, err := os.ReadDir(dir_name)
-		if err != nil { humain.Err("couldnt locate directory: %v", dir_name) }
+		fmt.Println("\n\033[7m SUMMARY \033[0m")
+		fmt.Println("  Hypercrypt is designed to be a simple cryptographic utility" +
+		"\n  that takes in data from a terminal, file or every file in a directory and" +
+		"\n  puts the data through a cryptographic process to be converted" +
+
+		"\n\n  When the data is gathered and is processed, the original file will be deleted" +
+		"\n  and the new processed file will be put in its place - the new file will have" +
+		"\n  either '_e' or '_d' appended to the original name based on the users usage")
+
+		fmt.Println("\n\033[7m MISC OPTIONS \033[0m")
+		fmt.Println("  -h\n\tdisplay this message and exit")
+
+		fmt.Println("  -k\n\twhen active it will keep the original file instead of" +
+		"\n\tdeleting it")
+
+		fmt.Println("\n\033[7m DATA OPTIONS \033[0m")
+		fmt.Println("  -t\n\twill ask for the message to be processed in the terminal" +
+		"\n\tNOTE: this option is only here for demonstration purposes, using it" +
+		"\n\tas an actual means of en/decrypting data would be discouraged")
+
+		fmt.Println("  -f\n\twill ask for the file to be processed")
+
+		fmt.Println("  -d\n\twill ask for the directory that holds all the files to be processed")
+
+		fmt.Println("\n\033[7m MODE OPTIONS \033[0m")
+		fmt.Println("  -E\n\tactivate encryption for the data provided")
+
+		fmt.Println("  -D\n\tactivate decryption for the data provided")
+	}
+
+	flag.Parse()
+
+	if !*t && !*f && !*d { log.Fatalln("Data flag not defined, try -h") }
+	if !*E && !*D { log.Fatalln("Cryptographic flag not defined, try -h") }
+
+	if *t {
+		input	:= humain.Input("Enter message").(string)
+		key		:= humain.Input("Enter key").(string)
 
 		switch {
-			case *E: 
-			case *D: 
-			default: humain.Err("Proper arguments were not defined, try -h")
+			case *E:
+				bin_data := to_binary(input)
+				encr := convertor(bin_data, key, "e")
+				fmt.Printf("%s\n", encr)
+
+			case *D:
+				bin_data := to_binary(input)
+				decr := convertor(bin_data, key, "d")
+				fmt.Printf("%s\n", decr)
+		}
+
+	} else if *f {
+		input	:= humain.Input("Enter name or path of file").(string)
+		key		:= humain.Input("Enter key").(string)
+
+		contents, err := os.ReadFile(input)
+		humain.Err("couldnt locate file: %v\n%v", err, contents, err)
+
+		switch {
+			case *E:
+				encr := convertor(contents, key, "e")
+				save_data_to_file(input, encr, *k, "e")
+
+			case *D:
+				decr := convertor(contents, key, "d")
+				save_data_to_file(input, decr, *k, "d")
 		}
 
 	} else if *d {
-		dir_name := humain.Input("Enter name or path of directory")
+		dir_name:= humain.Input("Enter name or path of directory").(string)
+		key		:= humain.Input("Enter key").(string)
+
 		dir_contents, err := os.ReadDir(dir_name)
-		if err != nil { humain.Err("couldnt locate directory: %v", dir_name) }
+		humain.Err("couldnt locate directory: %v", err, dir_name)
 
 		switch {
-			case *E: encr_dir(dir_name, dir_contents, 0, key_len)
-			case *D: decr_dir(dir_name, dir_contents, 0, key_len)
-			default: humain.Err("Proper arguments were not defined, try -h")
+			case *E: cryptify_dir(dir_name, dir_contents, 0, *k, key, "e")
+			case *D: cryptify_dir(dir_name, dir_contents, 0, *k, key, "d")
 		}
-
-	} else { humain.Err("Proper arguments were not defined, try -h") }
+	}
 }
