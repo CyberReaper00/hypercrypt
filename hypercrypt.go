@@ -12,6 +12,52 @@ import (
 
 func to_binary(data string) []byte { return []byte(data) }
 
+func v_enc(plaintext []byte, key string) []byte {
+	ciphertext := make([]byte, len(plaintext))
+	key = strings.ToUpper(key)
+	keyIndex := 0
+
+	for i, b := range plaintext {
+		if b >= 'A' && b <= 'Z' {
+			shift := int(key[keyIndex%len(key)]) - 'A'
+			shiftedChar := (b-'A'+byte(shift))%26 + 'A'
+			ciphertext[i] = shiftedChar
+			keyIndex++
+
+		} else if b >= 'a' && b <= 'z' {
+			shift := int(key[keyIndex%len(key)]) - 'A'
+			shiftedChar := (b-'a'+byte(shift))%26 + 'a'
+			ciphertext[i] = shiftedChar
+			keyIndex++
+
+		} else { ciphertext[i] = b }
+	}
+	return ciphertext
+}
+
+func v_dec(ciphertext []byte, key string) []byte {
+	plaintext := make([]byte, len(ciphertext))
+	key = strings.ToUpper(key)
+	keyIndex := 0
+
+	for i, b := range ciphertext {
+		if b >= 'A' && b <= 'Z' {
+			shift := int(key[keyIndex%len(key)]) - 'A'
+			shiftedChar := (b-'A'-byte(shift)+26)%26 + 'A'
+			plaintext[i] = shiftedChar
+			keyIndex++
+
+		} else if b >= 'a' && b <= 'z' {
+			shift := int(key[keyIndex%len(key)]) - 'A'
+			shiftedChar := (b-'a'-byte(shift)+26)%26 + 'a'
+			plaintext[i] = shiftedChar
+			keyIndex++
+
+		} else { plaintext[i] = b }
+	}
+	return plaintext
+}
+
 func convertor(data []byte, key string, action string) []byte {
 	var shift int
 	key_len := len(key)
@@ -21,45 +67,23 @@ func convertor(data []byte, key string, action string) []byte {
 	} else { shift = key_len % 8 }
 
 	var rotated byte
-	for i, b := range data {
-		switch action {
-			case "e": rotated = (b << shift) | (b >> (8 - shift))
-			case "d": rotated = (b >> shift) | (b << (8 - shift))
-		}
-		e_data[i] = rotated & 0xFF
+	switch action {
+		case "e":
+			for i, b := range data {
+				rotated = (b << shift) | (b >> (8 - shift))
+				e_data[i] = rotated & 0xFF
+			}
+
+		case "d":
+			for i, b := range data {
+				rotated = (b >> shift) | (b << (8 - shift))
+				e_data[i] = rotated & 0xFF
+			}
 	}
 	return e_data
 }
 
-// func encryption(data []byte, key_len int) []byte {
-// 	var shift int
-// 	e_data := make([]byte, len(data))
-//
-// 	if key_len % 8 == 0 { shift = 7
-// 	} else { shift = key_len % 8 }
-//
-// 	for i, b := range data {
-// 		rotated	 := (b << shift) | (b >> (8 - shift))
-// 		e_data[i] = rotated & 0xFF
-// 	}
-// 	return e_data
-// }
-//
-// func decryption(data []byte, key_len int) []byte {
-// 	var shift int
-// 	d_data := make([]byte, len(data))
-//
-// 	if key_len % 8 == 0 { shift = 7
-// 	} else { shift = key_len % 8 }
-//
-// 	for i, b := range data {
-// 		rotated  := (b >> shift) | (b << (8 - shift))
-// 		d_data[i] = rotated & 0xFF
-// 	}
-// 	return d_data
-// }
-
-func save_data_to_file(entry string, data []byte, keep bool, action string) {
+func save_data_to_file(entry string, data []byte, action string) {
 
 	var new_file string
 
@@ -88,28 +112,33 @@ func save_data_to_file(entry string, data []byte, keep bool, action string) {
 	defer file_ptr.Close()
 
 	fmt.Printf("%s%s's data has been %s into %s'\n\n", filename, ext, action, new_file)
-	if !keep {
-		err = os.Remove(entry)
-		humain.Err("couldnt remove %v\n%v", err, entry, err)
-	}
 }
 
 func cryptify_dir(main_dir string, dir []os.DirEntry, i int, keep bool, key string, action string) {
-	if (i >= len(dir)) { return }
+
+	if (i >= len(dir) && !keep) {
+		err := os.RemoveAll(main_dir)
+		humain.Err("couldnt remove %v\n%v", err, dir[i-1].Name(), err)
+		return
+
+	} else if (i >= len(dir)) { return }
 
 	filepath := path.Join(main_dir, dir[i].Name())
 	filedata, err := os.ReadFile(filepath)
 	humain.Err("couldnt read file: %v\n%v", err, dir[i].Name(), err)
 
+	var new_data []byte
 	var output []byte
 	switch action {
 		case "e":
-			output = convertor(filedata, key, action)
+			new_data = v_enc(filedata, key)
+			output   = convertor(new_data, key, action)
 		case "d":
-			output = convertor(filedata, key, action)
+			new_data = convertor(filedata, key, action)
+			output   = v_dec(new_data, key)
 	}
 
-	save_data_to_file(filepath, output, keep, action)
+	save_data_to_file(filepath, output, action)
 	cryptify_dir(main_dir, dir, i+1, keep, key, action)
 }
 
@@ -125,36 +154,34 @@ func main() {
 	flag.Usage = func() {
 		fmt.Println("usage: [-h] [-k] [-options ...]")
 
-		fmt.Println("\n\033[7m SUMMARY \033[0m")
-		fmt.Println("  Hypercrypt is designed to be a simple cryptographic utility" +
-		"\n  that takes in data from a terminal, file or every file in a directory and" +
-		"\n  puts the data through a cryptographic process to be converted" +
+		fmt.Println("" +
+		"\nHypercrypt is designed to be a simple cryptographic utility that" +
+		"\ntakes in data from a terminal, file or every file in a directory" +
+		"\nand puts the data through a cryptographic process to be converted" +
 
-		"\n\n  When the data is gathered and is processed, the original file will be deleted" +
-		"\n  and the new processed file will be put in its place - the new file will have" +
-		"\n  either '_e' or '_d' appended to the original name based on the users usage")
+		"\n\nWhen the data is gathered and is processed, the original file" +
+		"\nwill be deleted and the new processed file will be put in its place" +
+		"\nThe new file will have either '_e' or '_d' appended to the original" +
+		"\nname, based on the users usage" +
 
-		fmt.Println("\n\033[7m MISC OPTIONS \033[0m")
-		fmt.Println("  -h\n\tdisplay this message and exit")
+		"\n\n\033[7m MISC OPTIONS \033[0m" +
+		"\n  -h\n\tdisplay this message and exit" +
+		"\n  -k\n\twhen active it will keep the original file instead of" +
+		"\n\tdeleting it" +
 
-		fmt.Println("  -k\n\twhen active it will keep the original file instead of" +
-		"\n\tdeleting it")
+		"\n\n\033[7m DATA OPTIONS \033[0m" +
+		"\n  -t\n\twill ask for the message to be processed in the terminal" +
+		"\n\tNOTE: this option is only here for demonstration purposes" +
+		"\n\tusing it as an actual means of en/decrypting data would be" +
+		"\n\tdiscouraged" +
+		"\n  -f\n\twill ask for the file to be processed" +
+		"\n  -d\n\twill ask for the directory that holds all the files to be" +
+		"\n\tprocessed" +
 
-		fmt.Println("\n\033[7m DATA OPTIONS \033[0m")
-		fmt.Println("  -t\n\twill ask for the message to be processed in the terminal" +
-		"\n\tNOTE: this option is only here for demonstration purposes, using it" +
-		"\n\tas an actual means of en/decrypting data would be discouraged")
-
-		fmt.Println("  -f\n\twill ask for the file to be processed")
-
-		fmt.Println("  -d\n\twill ask for the directory that holds all the files to be processed")
-
-		fmt.Println("\n\033[7m MODE OPTIONS \033[0m")
-		fmt.Println("  -E\n\tactivate encryption for the data provided")
-
-		fmt.Println("  -D\n\tactivate decryption for the data provided")
+		"\n\n\033[7m MODE OPTIONS \033[0m" +
+		"\n  -E\n\tactivate encryption for the data provided" +
+		"\n  -D\n\tactivate decryption for the data provided")
 	}
-
 	flag.Parse()
 
 	if !*t && !*f && !*d { log.Fatalln("Data flag not defined, try -h") }
@@ -167,30 +194,34 @@ func main() {
 		switch {
 			case *E:
 				bin_data := to_binary(input)
-				encr := convertor(bin_data, key, "e")
+				v_data := v_enc(bin_data, key)
+				encr := convertor(v_data, key, "e")
 				fmt.Printf("%s\n", encr)
 
 			case *D:
 				bin_data := to_binary(input)
 				decr := convertor(bin_data, key, "d")
-				fmt.Printf("%s\n", decr)
+				v_data := v_dec(decr, key)
+				fmt.Printf("%s\n", v_data)
 		}
 
 	} else if *f {
-		input	:= humain.Input("Enter name or path of file").(string)
-		key		:= humain.Input("Enter key").(string)
+		input := humain.Input("Enter name or path of file").(string)
+		key	  := humain.Input("Enter key").(string)
 
 		contents, err := os.ReadFile(input)
 		humain.Err("couldnt locate file: %v\n%v", err, contents, err)
 
 		switch {
 			case *E:
-				encr := convertor(contents, key, "e")
-				save_data_to_file(input, encr, *k, "e")
+				v_data := v_enc(contents, key)
+				encr   := convertor(v_data, key, "e")
+				save_data_to_file(input, encr, "e")
 
 			case *D:
-				decr := convertor(contents, key, "d")
-				save_data_to_file(input, decr, *k, "d")
+				decr   := convertor(contents, key, "d")
+				v_data := v_dec(decr, key)
+				save_data_to_file(input, v_data, "d")
 		}
 
 	} else if *d {
