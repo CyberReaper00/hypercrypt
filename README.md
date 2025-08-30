@@ -1,6 +1,4 @@
 # Hypercrypt
-A simple and highly secure encryption program written in go
-
 I have made this as a simple hobby project, it is not extensive or all encompassing in any way but i just wanted to see if i could build it
 ## Usage
 `hc -h`
