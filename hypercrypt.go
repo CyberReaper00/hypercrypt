@@ -14,20 +14,20 @@ func to_binary(data string) []byte { return []byte(data) }
 
 func v_enc(plaintext []byte, key string) []byte {
 	ciphertext := make([]byte, len(plaintext))
-	key = strings.ToUpper(key)
-	keyIndex := 0
+	key			= strings.ToUpper(key)
+	keyIndex   := 0
 
 	for i, b := range plaintext {
 		if b >= 'A' && b <= 'Z' {
-			shift := int(key[keyIndex%len(key)]) - 'A'
-			shiftedChar := (b-'A'+byte(shift))%26 + 'A'
-			ciphertext[i] = shiftedChar
+			shift 			:= int(key[keyIndex%len(key)]) - 'A'
+			shiftedChar 	:= (b-'A'+byte(shift))%26 + 'A'
+			ciphertext[i]	 = shiftedChar
 			keyIndex++
 
 		} else if b >= 'a' && b <= 'z' {
-			shift := int(key[keyIndex%len(key)]) - 'A'
-			shiftedChar := (b-'a'+byte(shift))%26 + 'a'
-			ciphertext[i] = shiftedChar
+			shift 			:= int(key[keyIndex%len(key)]) - 'A'
+			shiftedChar 	:= (b-'a'+byte(shift))%26 + 'a'
+			ciphertext[i] 	 = shiftedChar
 			keyIndex++
 
 		} else { ciphertext[i] = b }
@@ -36,21 +36,21 @@ func v_enc(plaintext []byte, key string) []byte {
 }
 
 func v_dec(ciphertext []byte, key string) []byte {
+	key		   = strings.ToUpper(key)
+	keyIndex  := 0
 	plaintext := make([]byte, len(ciphertext))
-	key = strings.ToUpper(key)
-	keyIndex := 0
 
 	for i, b := range ciphertext {
 		if b >= 'A' && b <= 'Z' {
-			shift := int(key[keyIndex%len(key)]) - 'A'
-			shiftedChar := (b-'A'-byte(shift)+26)%26 + 'A'
-			plaintext[i] = shiftedChar
+			shift 			:= int(key[keyIndex%len(key)]) - 'A'
+			shiftedChar 	:= (b-'A'-byte(shift)+26)%26 + 'A'
+			plaintext[i] 	 = shiftedChar
 			keyIndex++
 
 		} else if b >= 'a' && b <= 'z' {
-			shift := int(key[keyIndex%len(key)]) - 'A'
-			shiftedChar := (b-'a'-byte(shift)+26)%26 + 'a'
-			plaintext[i] = shiftedChar
+			shift 			:= int(key[keyIndex%len(key)]) - 'A'
+			shiftedChar 	:= (b-'a'-byte(shift)+26)%26 + 'a'
+			plaintext[i] 	 = shiftedChar
 			keyIndex++
 
 		} else { plaintext[i] = b }
@@ -70,14 +70,14 @@ func convertor(data []byte, key string, action string) []byte {
 	switch action {
 		case "e":
 			for i, b := range data {
-				rotated = (b << shift) | (b >> (8 - shift))
-				e_data[i] = rotated & 0xFF
+				rotated 	= (b << shift) | (b >> (8 - shift))
+				e_data[i] 	= rotated & 0xFF
 			}
 
 		case "d":
 			for i, b := range data {
-				rotated = (b >> shift) | (b << (8 - shift))
-				e_data[i] = rotated & 0xFF
+				rotated 	= (b >> shift) | (b << (8 - shift))
+				e_data[i] 	= rotated & 0xFF
 			}
 	}
 	return e_data
@@ -123,12 +123,12 @@ func cryptify_dir(main_dir string, dir []os.DirEntry, i int, keep bool, key stri
 
 	} else if (i >= len(dir)) { return }
 
-	filepath := path.Join(main_dir, dir[i].Name())
-	filedata, err := os.ReadFile(filepath)
+	filepath 		:= path.Join(main_dir, dir[i].Name())
+	filedata, err 	:= os.ReadFile(filepath)
 	humain.Err("couldnt read file: %v\n%v", err, dir[i].Name(), err)
 
 	var new_data []byte
-	var output []byte
+	var output   []byte
 	switch action {
 		case "e":
 			new_data = v_enc(filedata, key)
@@ -188,20 +188,20 @@ func main() {
 	if !*E && !*D { log.Fatalln("Cryptographic flag not defined, try -h") }
 
 	if *t {
-		input	:= humain.Input("Enter message").(string)
-		key		:= humain.Input("Enter key").(string)
+		input:= humain.Input("Enter message").(string)
+		key	 := humain.Input("Enter key").(string)
 
 		switch {
 			case *E:
-				bin_data := to_binary(input)
-				v_data := v_enc(bin_data, key)
-				encr := convertor(v_data, key, "e")
+				bin_data 	:= to_binary(input)
+				v_data		:= v_enc(bin_data, key)
+				encr 		:= convertor(v_data, key, "e")
 				fmt.Printf("%s\n", encr)
 
 			case *D:
-				bin_data := to_binary(input)
-				decr := convertor(bin_data, key, "d")
-				v_data := v_dec(decr, key)
+				bin_data 	:= to_binary(input)
+				decr 		:= convertor(bin_data, key, "d")
+				v_data 		:= v_dec(decr, key)
 				fmt.Printf("%s\n", v_data)
 		}
 
