@@ -1,6 +1,8 @@
 # Hypercrypt
 I have made this as a simple hobby project, it is not extensive or all encompassing in any way but i just wanted to see if i could build it
 ## Usage
+If you want to use this from anywhere on your computer then you must add it to your path, if you dont know how to do that then you can just ask AI on how to do it on your specific system, its a very simple process
+
 `<application-name> -h`
 - Hypercrypt requires two flags at minimum to function
 	- Misc Flags
