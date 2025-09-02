@@ -1,7 +1,7 @@
 # Hypercrypt
 I have made this as a simple hobby project, it is not extensive or all encompassing in any way but i just wanted to see if i could build it
 ## Usage
-`hc -h`
+`<application-name> -h`
 - Hypercrypt requires two flags at minimum to function
 	- Misc Flags
 		- `-h`: shows the help message and exits
